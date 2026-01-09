@@ -40,6 +40,8 @@ class SendPeriodCAN(TestStep): # Inheriting from opentap.TestStep causes it to b
 
     CANExt = property(Boolean, False)\
         .add_attribute(OpenTap.Display("Extended ID", "", "Input", 0.3))
+    CANFDMode = property(Boolean, False)\
+        .add_attribute(OpenTap.Display("FD Mode", "", "Input", 0.4))
     
 #    CANTimeout = property(Double, 1.0)\
 #        .add_attribute(OpenTap.Display("CAN Timeout", "", "Input", 0.4))
@@ -64,7 +66,7 @@ class SendPeriodCAN(TestStep): # Inheriting from opentap.TestStep causes it to b
     ##@attribute(OpenTap.EnabledIf("FrequencyIsDefault", False, HideIfDisabled = True))
     def __init__(self):
         super().__init__() # The base class initializer must be invoked.
-        self.log.Info("Init ReadCalibration message")
+        self.log.Info("Init Send Periodic CAN message")
 
         
         # Add validation rules for the property. This makes it possible to tell the user about invalid property values.
@@ -82,7 +84,7 @@ class SendPeriodCAN(TestStep): # Inheriting from opentap.TestStep causes it to b
         _dout = bytes(self.CANData)
         self.log.Debug("init dout = {0}", _dout)
         try:
-            self.Dut.SendPeriodicCAN(self.CANID, _dout, self.CANExt, self.CANPeriod, self.CANDuration, self.IncrementByte, self.Increment, self.ByteLocation)
+            self.Dut.SendPeriodicCAN(self.CANID, _dout, self.CANExt, self.CANPeriod, self.CANDuration, self.IncrementByte, self.Increment, self.ByteLocation, self.CANFDMode)
         except Exception as e:
             self.log.Error("Periodic CAN message to ID {0} failed to", self.CANID)
             self.log.Debug(e)

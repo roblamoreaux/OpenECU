@@ -6,6 +6,7 @@ import clr
 clr.AddReference("System.Collections")
 from System.Collections.Generic import List
 from opentap import *
+import numpy as np
 
 import OpenTap 
 import math
@@ -66,22 +67,26 @@ class ReadMeasurement(TestStep): # Inheriting from opentap.TestStep causes it to
 
     ##@attribute(OpenTap.EnabledIf("FrequencyIsDefault", False, HideIfDisabled = True))
     def __init__(self):
-        super().__init__() # The base class initializer must be invoked.
-        self.log.Info("Init ReadMeasurement message")
-        self.Available = List[String]()
-        self.IsRunning = False
+        try:
+            super().__init__() # The base class initializer must be invoked.
+            self.log.Info("Init ReadMeasurement message")
+            self.Available = List[String]()
+            self.IsRunning = False
 
-        # object types should be initialized in the constructor.
-        self.Logging = OpenTap.Enabled[String]()
-        # assign available cal from DUT characteristics list
-        # need to add a filter here to reduce number of selections
-        #self.Available = self.Dut.Measurements 
-        for x in self.Dut.Measurements:
-            s = "{}".format(x)
-            #self.log.Debug("current measurement = " + s)
-            if self.is_InFilter(s):   #.Contains(self.Filter):
-                self.Available.Add(s)
-        self.log.Debug("updated self.available: {}".format(self.Available[0]))
+            # object types should be initialized in the constructor.
+            self.Logging = OpenTap.Enabled[String]()
+            # assign available cal from DUT characteristics list
+            # need to add a filter here to reduce number of selections
+            #self.Available = self.Dut.Measurements 
+            for x in self.Dut.Measurements:
+                s = "{}".format(x)
+                #self.log.Debug("current measurement = " + s)
+                if self.is_InFilter(s):   #.Contains(self.Filter):
+                    self.Available.Add(s)
+        except Exception as e:
+            self.log.Error("DUT not defined {0}", e)
+
+        #self.log.Debug("updated self.available: {}".format(self.Available[0]))
         self.Rules.Add(Rule("Filter", lambda: self.RunRule() , lambda: 'Filter sepcified'))
 #       
         
@@ -89,7 +94,7 @@ class ReadMeasurement(TestStep): # Inheriting from opentap.TestStep causes it to
     def is_InFilter(self, s = ""):
         #self.log.Debug("is_InFilter s = " + s + "filter = " + self.Filter)
         if (self.Filter  != ""):
-             if s.find(self.Filter) == -1: 
+             if s.find(self.Filter.upper()) == -1: 
                 return False # not in string
              else:
                  return True
@@ -101,18 +106,23 @@ class ReadMeasurement(TestStep): # Inheriting from opentap.TestStep causes it to
         if (( not self.IsRunning ) and (self.Filter != self.PrevFilter)):
             #self.log.Debug("RM running Rule for filter '{0}' with previous filter '{1}'".format(self.Filter, self.PrevFilter))
             self.Available.Clear()
-            for x in self.Dut.Measurements:
-                s = "{}".format(x)
-                #self.log.Debug("current measurement = " + s)
-                if self.is_InFilter(s):   #.Contains(self.Filter):
-                    self.Available.Add(s)
-                    #self.log.Debug("added")
+            try:
+                for x in self.Dut.Measurements:
+                    s = "{}".format(x)
+                    #self.log.Debug("current measurement = " + s + t)
+                    if self.is_InFilter(s.upper()):   #.Contains(self.Filter):
+                        self.Available.Add(s)
+                        #self.log.Debug("added")
+            except Exception as e:
+                self.log.Error("DUT not defined {0}", e)
+
         self.PrevFilter = self.Filter
         return True
         
 
     def PrePlanRun(self):
         self.IsRunning = True
+        self.Filter = self.Measurement
         return super().PrePlanRun()
 
     def PostPlanRun(self):
@@ -129,24 +139,27 @@ class ReadMeasurement(TestStep): # Inheriting from opentap.TestStep causes it to
             # call read Measurement function here
             # self.MeasurementValue = self.Dut.ReadMeasurement(self.Measurement);
             self.MeasurementValue = self.Dut.ReadMeasurement(self.Measurement);
-            #self.log.Debug("Read Measurement {0}", cvalue )
-    
-            if (self.CheckLimits):
-                if ((self.MinimumValue > self.MeasurementValue) | (self.MaximumValue < self.MeasurementValue)):
+            self.log.Debug("Read Measurement {0}", self.MeasurementValue )
+    #### need to add code to compare limits for enumerations here because they return strings
+            if  np.isnan(self.MeasurementValue):
+                self.UpgradeVerdict(OpenTap.Verdict.Error)  # or should this be fail?
+            elif (self.CheckLimits):
+                if ((self.MinimumValue > self.MeasurementValue) | (self.MaximumValue < self.MeasurementValue) ):
                     self.UpgradeVerdict(OpenTap.Verdict.Fail)
-            
+                else:
+                    self.UpgradeVerdict(OpenTap.Verdict.Pass)
+            else:
+                self.UpgradeVerdict(OpenTap.Verdict.Pass)
 
             self.log.Info("Read Measurement {0} = {1}.",self.Measurement ,self.MeasurementValue)
     #        self.log.Info("Read Measurement {0}", self.Measurement )
     
             
-            # Set verdict
-            self.UpgradeVerdict(OpenTap.Verdict.Pass)
         except Exception as e:
-            self.log.Error(" Failed to Open to read measurement " + self.Measurement)
+            self.log.Error(" Failed to read measurement " + self.Measurement)
             self.log.Debug(e)
             self.UpgradeVerdict(OpenTap.Verdict.Error)
-        self.PublishResult("Read Measurement", ["Timestamp", "Measurement", "Value"], [time.asctime(), self.Measurement, self.MeasurementValue]);
+        self.PublishResult("Read Measurement", ["Measurement", "Value"], [ self.Measurement, self.MeasurementValue]);
 
 
 

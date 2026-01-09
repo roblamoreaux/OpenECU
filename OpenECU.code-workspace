@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../pythonccp"
+		}
+	],
+	"settings": {
+		"python.autoComplete.extraPaths": [
+			"c:\\Users\\robert.lamoreaux\\.vscode\\extensions\\keysight.opentap-python-0.1.0\\out\\pythonStubs"
+		]
+	}
+}

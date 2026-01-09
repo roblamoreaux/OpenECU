@@ -277,17 +277,17 @@ class CANDut(Dut):
         PeriodicTask= {0: {'increment': 1, 'offset':  0}}
         
         self.log.Info(self.Name + " Opening")
-        can_filters = [{"can_id": 0x6f8, "can_mask": 0x7ff, "extended": True}]
+        #can_filters = [{"can_id": 0x6f8, "can_mask": 0x7ff, "extended": True}]
 
         if (self.CANInterface == "neovi"):
             _channel = self.NeoviChannels[self.Channel]
         else:
             _channel = self.Channel
         self.log.Debug("Opening CAN Interface {0}, Channel {1}, bitrate {2}".format(self.CANInterface, self.Channel, self.CANBitRate))
-        self.transport = ccp.CANTransport(self.CANInterface, _channel, self.CANBitRate)
+        #self.transport = ccp.CANTransport(self.CANInterface, _channel, self.CANBitRate)
 
         self.bus = can.interface.Bus(interface=self.CANInterface, app_name= None, channel=_channel, bitrate=self.CANBitRate)
-        self.bus.set_filters(can_filters)
+        #self.bus.set_filters(can_filters)
         ######### 
         #  Open ccp here
         #   Connect to CCP ECU
@@ -306,7 +306,7 @@ class CANDut(Dut):
         self.log.Info(self.Name + " Closed")
      
 # works as test    def SendCAN(self, arbitration_id=0xC0FFEE, data=44444, is_extended_id=True):
-    def SendCAN(self, arbitration_id=0xC0FFEE, dataout=[1,2,3,4,5,6,7,8], is_extended_id=True):
+    def SendCAN(self, arbitration_id=0xC0FFEE, dataout=[1,2,3,4,5,6,7,8], is_extended_id=True, is_fd=False):
         """enter function to send here"""
         #convert physical to data first
         # Download data now
@@ -329,14 +329,27 @@ class CANDut(Dut):
                 "__weakref__",  # support weak references to messages
             )
         """
-        self.log.Debug("package Message for interface {0}, to CANID  {1} of length {2} with data {3}", self.bus.channel_info, arbitration_id, 4, dataout)
+        self.log.Debug("package Message for interface {0}, to CANID  {1} with data {2}", self.bus.channel_info, arbitration_id, dataout)
         #_msgSend = can.Message( arbitration_id=arbitration_id, data=[1,2,3,4,5,6,7,8], is_extended_id=False)
-        _msgSend = can.Message( arbitration_id=arbitration_id, data=dataout, is_extended_id=is_extended_id)
+        _msgSend = can.Message( 
+            arbitration_id=arbitration_id, 
+            is_extended_id= is_extended_id,
+            is_remote_frame=False,
+            is_error_frame= False,
+            channel = None,
+            dlc= len(dataout),
+            data= dataout,
+            is_fd= is_fd,
+            is_rx= False,
+            #bitrate_switch= False,
+            error_state_indicator=False
+        )
+
         #_msgSend = can.Message( arbitration_id=arbitration_id, data=[data[0], data[1],data[2],data[3],data[4],data[5]], is_extended_id=is_extended_id)
-        self.log.Debug("Lets sendCAN Message sent to bus {0} for CANID  {1} of length {2} with data {3}", self.bus.channel_info, _msgSend.arbitration_id, _msgSend.dlc, _msgSend)
+        self.log.Debug("Lets sendCAN Message sent to bus {0} for CANID  {1} of length {2} with data {3}. Errorcode {4}", self.bus.channel_info, _msgSend.arbitration_id, _msgSend.dlc, _msgSend, can.CanError)
         try:
             self.log.Debug("GO try")
-            self.bus.send(_msgSend, 1)
+            self.bus.send(_msgSend)
             self.log.Info("CAN Message sent on  {0} to CANID  {1}", self.bus.channel_info, _msgSend.dlc)
             
         except can.CanError:
@@ -344,7 +357,7 @@ class CANDut(Dut):
 
 # Send periodic CAN messages with possibility to increment a byte every message
 # need to find a way to have every call use different increment settings
-    def SendPeriodicCAN(self, arbitration_id=0xC0FFEE, dataout=[1,2,3,4,5,6,7,8], is_extended_id=True, SendPeriod=1.0, SendDuration=10, IncrementByte=False, Increment= 1, ByteLocation=1):
+    def SendPeriodicCAN(self, arbitration_id=0xC0FFEE, dataout=[1,2,3,4,5,6,7,8], is_extended_id=True, SendPeriod=1.0, SendDuration=10, IncrementByte=False, Increment= 1, ByteLocation=1, is_fd=False):
         """enter function to send here"""
         
         """ Can Message format"""    
@@ -367,7 +380,7 @@ class CANDut(Dut):
         """
         self.log.Debug("package periodic Message for bus {0} to CANID  {1} every {4} seconds of length {2} with data {3}", self.bus.channel_info, arbitration_id, 4, dataout, SendPeriod)
         
-        _msgSend = can.Message( arbitration_id=arbitration_id, data=dataout, is_extended_id=is_extended_id)
+        _msgSend = can.Message( arbitration_id=arbitration_id, data=dataout, channel=None, is_extended_id=is_extended_id, is_fd=is_fd)
         
         self.log.Debug("Lets sendCAN Message sent to bus {0} for CANID  {1}  every {4} seconds of length {2} with data {3}", self.bus.channel_info, _msgSend.arbitration_id, _msgSend.dlc, _msgSend, SendPeriod)
         try:
@@ -390,6 +403,9 @@ class CANDut(Dut):
         _offset = self.PeriodicTask[message.arbitration_id]['offset']
         _increment = self.PeriodicTask[message.arbitration_id]['increment']
         message.data[_offset] = (message.data[_offset] + _increment) % 0x100;
+    
+    def StopPeriodicCAN(self):
+        self.bus.stop_all_periodic_tasks()
 
     def ReadAnyCAN(self, timeout = 1.0):
         """ enter function here """

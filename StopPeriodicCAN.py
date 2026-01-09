@@ -29,34 +29,20 @@ from .CANDut import CANDut
 # Here is how a test step plugin is defined: 
 
 #Use the Display attribute to define how the test step should be presented to the user.
-@attribute(OpenTap.Display("Send CAN", "Send a CAN message from CAN DUT. (Python CAN)", "CAN Steps"))
+@attribute(OpenTap.Display("Stop Periodic CAN", "Stop Sending Periodic CAN messages from CAN DUT. (Python CAN)", "CAN Steps"))
 #AllowAnyChildAttribute is attribute that allows any child step to attached to this step
 @attribute(OpenTap.AllowAnyChild())
-class SendCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a test step plugin.
+class StopAllPeriodicCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a test step plugin.
     # Add properties (name, value, C# type)
     
     Dut = property(CANDut, None).add_attribute(OpenTap.Display( "DUT", "The DUT to use in the step.", "Resources"))
-    
-
-    CANExt = property(Boolean, False)\
-        .add_attribute(OpenTap.Display("Extended ID", "", "Input", 0.3))
-    CANFDMode = property(Boolean, False)\
-        .add_attribute(OpenTap.Display("FD Mode", "", "Input", 0.4))
-    
-#    CANTimeout = property(Double, 1.0)\
-#        .add_attribute(OpenTap.Display("CAN Timeout", "", "Input", 0.5))
-    CANID = property(Int32, 1)\
-        .add_attribute(OpenTap.Display("CAN ID", "", "Input", 0.1))
-
-    CANData = property(List[Byte],None)\
-        .add_attribute(OpenTap.Display("Data", "", "Input", 0.2))
-
+ 
     # bytearray(data)
 
     ##@attribute(OpenTap.EnabledIf("FrequencyIsDefault", False, HideIfDisabled = True))
     def __init__(self):
         super().__init__() # The base class initializer must be invoked.
-        self.log.Info("Init ReadCalibration message")
+        self.log.Info("Init StopAllPeriodicCAN message")
 
         
         # Add validation rules for the property. This makes it possible to tell the user about invalid property values.
@@ -70,13 +56,12 @@ class SendCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a te
         super().Run() ## 3.0: Required for debugging to work. 
         try:
             # Write some log messages
-            _dout = bytes(self.CANData)
             #self.log.Info("init dout = {0}", _dout)
-            self.log.Info("Lets send a CAN message to ID {0}: with data[0] {1} ", self.CANID, _dout )
+            self.log.Info("Lets stop Sending All Periodic CAN messages" )
             
-            self.Dut.SendCAN(self.CANID, _dout, self.CANExt, self.CANFDMode)
+            self.Dut.StopPeriodicCAN()
         except Exception as e:
-            self.log.Error("CAN message to ID {0} failed to send self", self.CANID)
+            self.log.Error("StopPerdiodicCAN messages failed")
             self.log.Debug(e)
             self.UpgradeVerdict(OpenTap.Verdict.Error)
 

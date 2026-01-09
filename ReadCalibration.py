@@ -7,6 +7,7 @@ clr.AddReference("System.Collections")
 from System.Collections.Generic import List
 from opentap import *
 
+import numpy as np
 import OpenTap 
 import math
 from OpenTap import Log, AvailableValues, EnabledIfAttribute
@@ -68,19 +69,24 @@ class ReadCalibration(TestStep): # Inheriting from opentap.TestStep causes it to
 
     ##@attribute(OpenTap.EnabledIf("FrequencyIsDefault", False, HideIfDisabled = True))
     def __init__(self):
-        super().__init__() # The base class initializer must be invoked.
-        self.log.Info("Init ReadCalibration message")
-        self.Available = List[String]()
-        self.IsRunning = False
-        
-        # object types should be initialized in the constructor.
-        self.Logging = OpenTap.Enabled[String]()
-        # assign available cal from DUT characteristics list
-        for x in self.Dut.Characteristics:
-            s = "{}".format(x)
-            #self.log.Debug("current measurement = " + s)
-            if self.is_InFilter(s):   #.Contains(self.Filter):
-                self.Available.Add(s)
+        try:
+            super().__init__() # The base class initializer must be invoked.
+            self.log.Info("Init ReadCalibration message")
+            self.Available = List[String]()
+            self.IsRunning = False
+            
+            # object types should be initialized in the constructor.
+            self.Logging = OpenTap.Enabled[String]()
+            # assign available cal from DUT characteristics list
+            for x in self.Dut.Characteristics:
+                s = "{}".format(x)
+                #self.log.Debug("current measurement = " + s)
+                if self.is_InFilter(s):   #.Contains(self.Filter):
+                    self.Available.Add(s)
+        except Exception as e:
+            self.log.Error("DUT not defined {0}", e)
+
+
         self.Rules.Add(Rule("Filter", lambda: self.RunRule() , lambda: 'Filter sepcified'))
     
         
@@ -88,7 +94,7 @@ class ReadCalibration(TestStep): # Inheriting from opentap.TestStep causes it to
     def is_InFilter(self, s = ""):
         #self.log.Debug("is_InFilter s = " + s + "filter = " + self.Filter)
         if (self.Filter  != ""):
-             if s.find(self.Filter) == -1: 
+             if s.find(self.Filter.upper()) == -1: 
                 return False # not in string
              else:
                  return True
@@ -99,12 +105,15 @@ class ReadCalibration(TestStep): # Inheriting from opentap.TestStep causes it to
         if (( not self.IsRunning ) and (self.Filter != self.PrevFilter)):
             self.log.Debug("RCrunning Rule")
             self.Available.Clear()
-            for x in self.Dut.Characteristics:
-                s = "{}".format(x)
-                #self.log.Debug("current measurement = " + s)
-                if self.is_InFilter(s):   #.Contains(self.Filter):
-                    self.Available.Add(s)
-                    #self.log.Debug("added")
+            try:
+                for x in self.Dut.Characteristics:
+                    s = "{}".format(x)
+                    #self.log.Debug("current measurement = " + s)
+                    if self.is_InFilter(s.upper()):   #.Contains(self.Filter):
+                        self.Available.Add(s)
+                        #self.log.Debug("added")
+            except Exception as e:
+                self.log.Error("DUT not defined {0}", e)
         self.PrevFilter = self.Filter
             
         return True
@@ -112,6 +121,7 @@ class ReadCalibration(TestStep): # Inheriting from opentap.TestStep causes it to
 
     def PrePlanRun(self):
         self.IsRunning = True
+        self.Filter = self.Calibration
         return super().PrePlanRun()
 
     def PostPlanRun(self):
@@ -130,18 +140,23 @@ class ReadCalibration(TestStep): # Inheriting from opentap.TestStep causes it to
         # self.CalibrationValue = self.Dut.ReadCalibration(self.Calibration);
         try:
             self.CalibrationValue = self.Dut.ReadCalibration(self.Calibration);
-            #self.log.Debug("Read Calibration {0}", cvalue )
-            if (self.CheckLimits):
-                if ((self.MinimumValue > self.CalibrationValue) | (self.MaximumValue < self.CalibrationValue)):
+            self.log.Debug("Read Calibration {0}", self.CalibrationValue  )
+            if  np.isnan(self.CalibrationValue):
+                self.UpgradeVerdict(OpenTap.Verdict.Error)  # or should this be fail?
+            elif (self.CheckLimits):
+                if ((self.MinimumValue > self.CalibrationValue) | (self.MaximumValue < self.CalibrationValue) ):
                     self.UpgradeVerdict(OpenTap.Verdict.Fail)
+                else:
+                    self.UpgradeVerdict(OpenTap.Verdict.Pass)
 
+            else:
+                # Set verdict
+                self.UpgradeVerdict(OpenTap.Verdict.Pass)
             self.log.Info("Read Calibration {0} = {1}.",self.Calibration ,self.CalibrationValue)
             #self.log.Debug("Calibration Value {0}.",   self.CalibrationValue)
 
-            # Set verdict
-            self.UpgradeVerdict(OpenTap.Verdict.Pass)
         except Exception as e:
             self.log.Error("Failed to read calibration {0}", self.Calibration)
             self.log.Debug(e)
             self.UpgradeVerdict(OpenTap.Verdict.Error)
-        self.PublishResult("Read Calibration", ["Timestamp", "Calibration", "Value"], [time.asctime(), self.Calibration, self.CalibrationValue]);
+        self.PublishResult("Read Calibration", [ "Calibration", "Value"], [self.Calibration, self.CalibrationValue]);

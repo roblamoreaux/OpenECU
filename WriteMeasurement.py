@@ -48,6 +48,7 @@ class WriteMeasurement(TestStep): # Inheriting from opentap.TestStep causes it t
         .add_attribute(OpenTap.Display("Measurement Filter", "", "Signal to Write", 0))
 
     PrevFilter = ""
+    PrevMeasurement = ""
 
     IsRunning = False
 
@@ -57,41 +58,63 @@ class WriteMeasurement(TestStep): # Inheriting from opentap.TestStep causes it t
 
     ##@attribute(OpenTap.EnabledIf("FrequencyIsDefault", False, HideIfDisabled = True))
     def __init__(self):
-        super().__init__() # The base class initializer must be invoked.
-        self.log.Info("Init WriteMeasurement message")
-        self.Available = List[String]()
-        self.IsRunning = False
-        
-        # object types should be initialized in the constructor.
-        self.Logging = OpenTap.Enabled[String]()
-        # assign available cal from DUT characteristics list
-        for x in self.Dut.Measurements:
-            s = "{}".format(x)
-            #self.log.Debug("current measurement = " + s)
-            if self.is_InFilter(s):   #.Contains(self.Filter):
-                self.Available.Add(s)
+        try:
+            super().__init__() # The base class initializer must be invoked.
+            self.log.Info("Init WriteMeasurement message")
+            self.Available = List[String]()
+            self.IsRunning = False
+            
+            # object types should be initialized in the constructor.
+            self.Logging = OpenTap.Enabled[String]()
+            # assign available cal from DUT characteristics list
+            for x in self.Dut.Measurements:
+                s = "{}".format(x)
+                #self.log.Debug("current measurement = " + s)
+                if self.is_InFilter(s):   #.Contains(self.Filter):
+                    self.Available.Add(s)
+        except Exception as e:
+            self.log.Error("DUT not defined {0}", e)
+
         self.Rules.Add(Rule("Filter", lambda: self.RunRule() , lambda: 'Filter sepcified'))
+        self.Rules.Add(Rule("Measurement", lambda: self.RunRule1() , lambda: 'Measurement sepcified'))
     
     def is_InFilter(self, s = ""):
         #self.log.Debug("is_InFilter s = " + s + "filter = " + self.Filter)
         if (self.Filter  != ""):
-             if s.find(self.Filter) == -1: 
+             if s.find(self.Filter.upper()) == -1: 
                 return False # not in string
              else:
                  return True
         else:
              return True
-       
+
+    def RunRule1(self):
+        #if (( not self.IsRunning ) and (self.Measurement != self.PrevMeasurement)):
+        ##if (( not self.IsRunning ) and (self.Measurement != self.Filter)):
+        #   self.Filter = self.Measurement 
+        #   self.log.Debug("running Rule for Measurement {0} : {1} = {2}", self.Measurement, self.Filter, self.PrevFilter)
+        #self.PrevMeasurement = self.Measurement    
+        #self.Filter = self.Measurement
+        self.log.Debug("1running Rule for Measurement {0} : {1} = {2}", self.Measurement, self.Filter, self.PrevFilter)
+            
+        return True
+
     def RunRule(self):
+        self.log.Debug("running Rule for Filter {0} : {1} = {2}", self.Measurement, self.Filter, self.PrevFilter)
+        
         if (( not self.IsRunning ) and (self.Filter != self.PrevFilter)):
             self.log.Debug("WMrunning Rule")
             self.Available.Clear()
-            for x in self.Dut.Measurements:
-                s = "{}".format(x)
-                #self.log.Debug("current measurement = " + s)
-                if self.is_InFilter(s):   #.Contains(self.Filter):
-                        self.Available.Add(s)
-                        #self.log.Debug("added")
+            try:
+                for x in self.Dut.Measurements:
+                    s = "{}".format(x)
+                    #self.log.Debug("current measurement = " + s)
+                    if self.is_InFilter(s.upper()):   #.Contains(self.Filter):
+                            self.Available.Add(s)
+                            #self.log.Debug("added")
+            except Exception as e:
+                self.log.Error("DUT not defined {0}", e)
+
         self.PrevFilter = self.Filter
             
         return True
@@ -99,6 +122,7 @@ class WriteMeasurement(TestStep): # Inheriting from opentap.TestStep causes it t
 
     def PrePlanRun(self):
         self.IsRunning = True
+        self.Filter = self.Measurement 
         return super().PrePlanRun()
 
     def PostPlanRun(self):
@@ -116,7 +140,7 @@ class WriteMeasurement(TestStep): # Inheriting from opentap.TestStep causes it t
         # call Write Measurement function here
         try:
             
-                self.Dut.WriteMeasurement(self.Measurement, self.MeasurementValue);
+                error = self.Dut.WriteMeasurement(self.Measurement, self.MeasurementValue);
                 #self.log.Debug("Write Measurement {0}", cvalue )
                 self.MeasurementValue =  self.MeasurementValue + 1.0;
         #        self.log.Info("Lets create some results: " + self.MeasurementValue)
@@ -124,11 +148,16 @@ class WriteMeasurement(TestStep): # Inheriting from opentap.TestStep causes it t
         #        self.log.Debug("Write Measurement {0}", self.Measurement )
                 
                 # Set verdict
-                self.UpgradeVerdict(OpenTap.Verdict.Pass)
+                if error == 0:
+                    self.UpgradeVerdict(OpenTap.Verdict.Pass)
+                else:
+                    self.UpgradeVerdict(OpenTap.Verdict.Fail)
+                    self.log.Error("Failed to write Measuement {0}", self.Measurement)
+                
         except Exception as e:
             self.log.Error("Failed to write Measuement {0}", self.Measurement)
             self.log.Debug(e)
             self.UpgradeVerdict(OpenTap.Verdict.Error)
-        self.PublishResult("Write Measurement", ["Timestamp", "Measurement", "Value"], [time.asctime(), self.Measurement, self.MeasurementValue]);
+        self.PublishResult("Write Measurement", [ "Measurement", "Value"], [ self.Measurement, self.MeasurementValue]);
 
                 

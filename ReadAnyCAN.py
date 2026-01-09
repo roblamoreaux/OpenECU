@@ -23,6 +23,7 @@ from can.bus import BusState
 from can import *
 
 from .CANDut import CANDut
+import struct
 #from .CANSettings import CANSettings
 
 
@@ -58,9 +59,20 @@ class ReadAnyCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a
     CANValue = property(String, "")\
         .add_attribute(OpenTap.Display("Value", "", "Output", 1.1))\
         .add_attribute(OpenTap.Output())
+    CANData = property(List[Byte], None)\
+        .add_attribute(OpenTap.Display("Data", "", "Output", 1.15))\
+        .add_attribute(OpenTap.Output())
 
     CANTimeStamp = property(Double, 0)\
         .add_attribute(OpenTap.Display("TimeStamp", "", "Output", 1.2))\
+        .add_attribute(OpenTap.Output())
+
+    CANExt = property(Boolean, False)\
+        .add_attribute(OpenTap.Display("Extended ID", "", "Output", 1.3))\
+        .add_attribute(OpenTap.Output())
+
+    CANFDMode = property(Boolean, False)\
+        .add_attribute(OpenTap.Display("FD Mode", "", "Output", 1.4))\
         .add_attribute(OpenTap.Output())
 
     CheckLimits= property(Boolean, False)\
@@ -106,6 +118,7 @@ class ReadAnyCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a
         self.log.Info("Clear Any CAN Message returned {0:X} ", msg)
         self.log.Info("Lets create some results from reading a CAN message: " )
         self.CANID = 0
+        self.CANData = List[Byte]()
         try:
             msg = self.Dut.ReadAnyCAN(self.CANTimeout)
             if msg is not None:
@@ -113,10 +126,18 @@ class ReadAnyCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a
                 self.log.Info("Read Any CAN Message returned {0:X} ", msg)
                 self.CANID = msg.arbitration_id  #.arbitration_id
                 self.CANTimeStamp =  0 # msg.timestamp
+                self.CANExt = msg.is_extended_id
+                self.CANFDMode = msg.is_fd
     #            self.CANValue = "BADBEEFF1"
 
-                self.CANValue = "0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}"\
-                    .format( msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4], msg.data[5], msg.data[6], msg.data[7] )
+                    #self.CANValue = "0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}"\
+                    #    .format( msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4], msg.data[5], msg.data[6], msg.data[7] )
+                #self.CANValue = '0x'+' 0x'.join(struct.pack('B',x).hex() for x in msg.data)
+                self.CANValue = ' '.join(struct.pack('B',x).hex() for x in msg.data)
+                self.log.Info("CAN Message Data returned {0:X} ", msg.data)
+                for x in msg.data:
+                    self.CANData.Add(x)
+                #self.CANData = list(msg.data)
                 """self.CANValue[1] = msg.data[1]
                 self.CANValue[2] = msg.data[2]
                 self.CANValue[3] = msg.data[3]
@@ -155,7 +176,7 @@ class ReadAnyCAN(TestStep): # Inheriting from opentap.TestStep causes it to be a
             self.log.Error("Failed to read any CAN message")
             self.log.Debug(e)
             self.UpgradeVerdict(OpenTap.Verdict.Error)
-        self.PublishResult("Read Any CAN", ["Timestamp", "CANID", "Value"], [time.asctime(),  "0x{:08x}".format(self.CANID), self.CANValue]);
+        self.PublishResult("Read Any CAN", [ "CANID", "Value"], [  "0x{:08x}".format(self.CANID), self.CANValue]);
 
 
     
